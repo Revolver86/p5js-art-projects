@@ -122,33 +122,31 @@ float fbm4d(vec4 p) {
 // KLEIN BOTTLE PASSAGE in 4D
 // A non-orientable surface twisted through 4D space
 float kleinBottlePassage(vec4 p) {
-  // Gentle rotation - structures rotate, not the view
-  p *= rotXW(uTime * 0.08);
-  p *= rotZW(uTime * 0.12);
+  // Rotate ONLY in XY plane - keeps structure at same W coordinate
+  // NO XW or ZW rotations - those move it away from camera's W slice
+  p.xy *= rot2D(uTime * 0.15);
+  p.zw *= rot2D(uTime * 0.18);
 
-  // Scale down to make structure LARGER and always visible
-  p *= 0.3;
-
-  // Classic Klein bottle parameterization in 4D
+  // Klein bottle centered at origin, fills space from -3 to +3
   float u = atan(p.x, p.y);
   float v = atan(p.z, p.w);
 
-  // Klein bottle surface - made thicker
-  float r = 2.0 + cos(u);
+  // Klein bottle surface - BIG radius so it's always visible
+  float r = 3.0 + cos(u) * 0.8;
   vec4 surface;
   surface.x = r * cos(u) * cos(v);
   surface.y = r * sin(u) * cos(v);
   surface.z = r * cos(u) * sin(v);
-  surface.w = r * sin(u) * sin(v) + sin(u * 2.0); // 4D twist
+  surface.w = r * sin(u) * sin(v) + sin(u * 2.0) * 0.5; // 4D twist
 
-  float dist = length(p - surface) * 0.8; // Thicker
+  float dist = length(p - surface);
 
   // Add passage holes
   float holes = sin(u * 6.0) * sin(v * 4.0);
-  dist -= holes * 0.3;
+  dist -= holes * 0.15;
 
   // Eroded surface
-  dist += fbm4d(p * 2.0) * 0.15;
+  dist += fbm4d(p * 2.0) * 0.08;
 
   return dist;
 }
@@ -156,29 +154,27 @@ float kleinBottlePassage(vec4 p) {
 // HYPERBOLIC ARCHITECTURE
 // Curved negative-space chambers in 4D
 float hyperbolicChambers(vec4 p) {
-  // Gentle rotation
-  p *= rotYZ(uTime * 0.09);
+  // Rotate in YZ and XY - both keep W coordinate stable
+  p *= rotYZ(uTime * 0.12);
+  p.xy *= rot2D(uTime * 0.08);
 
-  // Scale to make larger
-  p *= 0.4;
-
-  // Hyperbolic tiling pattern - larger cells
+  // Hyperbolic tiling pattern - BIG cells that fill space
   vec4 q = p;
-  q.xy = abs(fract(q.xy / 4.0) - 0.5) * 4.0;
-  q.zw = abs(fract(q.zw / 4.0) - 0.5) * 4.0;
+  q.xy = abs(fract(q.xy / 6.0) - 0.5) * 6.0;
+  q.zw = abs(fract(q.zw / 6.0) - 0.5) * 6.0;
 
-  // Hyperbolic surfaces - thicker
-  float hyp = length(q.xy) * length(q.zw) - 2.0;
+  // Hyperbolic surfaces
+  float hyp = length(q.xy) * length(q.zw) - 3.0;
 
-  // Architectural details - thicker columns
-  vec4 cols = abs(fract(p / 2.0) - 0.5) * 2.0;
-  float columns = length(cols.xy) - 0.25;
-  columns = min(columns, length(cols.zw) - 0.25);
+  // Architectural details - thick columns
+  vec4 cols = abs(fract(p / 3.0) - 0.5) * 3.0;
+  float columns = length(cols.xy) - 0.3;
+  columns = min(columns, length(cols.zw) - 0.3);
 
   float arch = max(hyp, -columns);
 
   // Add decay
-  arch += noise4d(p * 3.0 + uTime * 0.1) * 0.1;
+  arch += noise4d(p * 2.0 + uTime * 0.1) * 0.08;
 
   return arch;
 }
@@ -186,18 +182,16 @@ float hyperbolicChambers(vec4 p) {
 // RECURSIVE TESSERACT CATACOMBS
 // Nested hypercubes forming burial chambers
 float tesseractCatacombs(vec4 p) {
-  // Gentle rotation
-  p *= rotXW(uTime * 0.06);
-  p *= rotZW(-uTime * 0.08);
-
-  // Scale to make larger
-  p *= 0.35;
+  // Rotate in XY and YZ - both keep W stable
+  // NO XW, YW, or ZW - those move structure away from camera's W slice
+  p.xy *= rot2D(uTime * 0.1);
+  p *= rotYZ(uTime * 0.13);
 
   float catacombs = MAX_DIST;
 
-  // Multiple nested tesseracts - larger scales
+  // Multiple nested tesseracts - BIG scales that fill space
   for(int i = 0; i < 3; i++) {
-    float scale = 3.5 - float(i) * 1.0;
+    float scale = 4.5 - float(i) * 1.2;
     vec4 q = p;
 
     // Tesseract distance field
@@ -205,20 +199,20 @@ float tesseractCatacombs(vec4 p) {
     float tesseract = min(max(max(max(d.x, d.y), d.z), d.w), 0.0) +
                       length(max(d, 0.0));
 
-    // Make it hollow (burial chambers) - thicker walls
-    tesseract = abs(tesseract) - 0.3;
+    // Make it hollow (burial chambers)
+    tesseract = abs(tesseract) - 0.25;
 
     catacombs = min(catacombs, tesseract);
   }
 
-  // Add skeletal structures inside chambers - thicker bones
-  vec4 bones = abs(fract(p * 0.5) - 0.5) * 2.0;
-  float skeleton = min(length(bones.xy), length(bones.zw)) - 0.12;
+  // Add skeletal structures inside chambers
+  vec4 bones = abs(fract(p * 0.4) - 0.5) * 2.5;
+  float skeleton = min(length(bones.xy), length(bones.zw)) - 0.15;
 
   catacombs = min(catacombs, skeleton);
 
   // Fractal detail
-  catacombs += sin(p.x * 10.0) * sin(p.y * 10.0) * sin(p.z * 10.0) * sin(p.w * 10.0) * 0.02;
+  catacombs += sin(p.x * 8.0) * sin(p.y * 8.0) * sin(p.z * 8.0) * sin(p.w * 8.0) * 0.02;
 
   return catacombs;
 }
@@ -346,29 +340,29 @@ void main() {
   vec3 ro3d, ta3d;
 
   if(shotCycle < 10.0) {
-    // Shot 1: Wide orbit showing Klein bottle
+    // Shot 1: Wide orbit showing Klein bottle - closer now that structures are bigger
     float t = shotCycle / 10.0;
     float angle = t * 6.28;
-    ro3d = vec3(12.0 * cos(angle), 4.0, 12.0 * sin(angle));
+    ro3d = vec3(8.0 * cos(angle), 3.0, 8.0 * sin(angle));
     ta3d = vec3(0.0, 0.0, 0.0);
   } else if(shotCycle < 20.0) {
     // Shot 2: Close approach to hyperbolic chambers
     float t = (shotCycle - 10.0) / 10.0;
     float angle = t * 3.14;
-    ro3d = vec3(8.0 * cos(angle), 2.0 + sin(t * 6.28) * 2.0, 8.0 * sin(angle));
-    ta3d = vec3(2.0 * cos(angle * 2.0), 0.0, 2.0 * sin(angle * 2.0));
+    ro3d = vec3(6.0 * cos(angle), 2.0 + sin(t * 6.28) * 1.5, 6.0 * sin(angle));
+    ta3d = vec3(1.5 * cos(angle * 2.0), 0.0, 1.5 * sin(angle * 2.0));
   } else if(shotCycle < 30.0) {
     // Shot 3: Circling tesseract catacombs
     float t = (shotCycle - 20.0) / 10.0;
     float angle = t * 6.28 * 1.5;
-    ro3d = vec3(9.0 * sin(angle), 3.0 * cos(t * 3.14), 9.0 * cos(angle));
+    ro3d = vec3(7.0 * sin(angle), 2.5 * cos(t * 3.14), 7.0 * cos(angle));
     ta3d = vec3(0.0, 0.0, 0.0);
   } else {
     // Shot 4: Slow pullback revealing everything
     float t = (shotCycle - 30.0) / 10.0;
     float angle = t * 6.28;
-    float dist = 10.0 + t * 5.0;
-    ro3d = vec3(dist * cos(angle), 5.0 + t * 3.0, dist * sin(angle));
+    float dist = 8.0 + t * 4.0;
+    ro3d = vec3(dist * cos(angle), 4.0 + t * 2.0, dist * sin(angle));
     ta3d = vec3(0.0, 0.0, 0.0);
   }
 
@@ -387,8 +381,8 @@ void main() {
 
   float d = rayMarch(ro, rd);
 
-  // Back to darker atmospheric background
-  vec3 col = VOID_PURPLE * 0.15;
+  // Atmospheric background with glow to prevent pure black
+  vec3 col = VOID_PURPLE * 0.25 + ELECTRIC_CYAN * 0.08;
 
   if(d < MAX_DIST) {
     vec4 p = ro + rd * d;
@@ -417,9 +411,9 @@ void main() {
     }
     ao = max(ao, 0.0);
 
-    // Combine lighting - balanced
-    float lighting = 0.3 + diff1 * 0.7 + diff2 * 0.3 + wLight;
-    col *= lighting * ao;
+    // Combine lighting - higher ambient to prevent blackness
+    float lighting = 0.45 + diff1 * 0.7 + diff2 * 0.35 + wLight;
+    col *= lighting * (0.7 + ao * 0.3); // Soften AO impact
 
     // Specular highlights on bone
     vec4 viewDir = normalize(-rd);
