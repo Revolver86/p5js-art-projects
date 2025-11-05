@@ -122,14 +122,18 @@ float fbm4d(vec4 p) {
 // KLEIN BOTTLE PASSAGE in 4D
 // A non-orientable surface twisted through 4D space
 float kleinBottlePassage(vec4 p) {
-  p *= rotXW(uTime * 0.15);
-  p *= rotZW(uTime * 0.23);
+  // Gentle rotation - structures rotate, not the view
+  p *= rotXW(uTime * 0.08);
+  p *= rotZW(uTime * 0.12);
+
+  // Scale down to make structure LARGER and always visible
+  p *= 0.3;
 
   // Classic Klein bottle parameterization in 4D
   float u = atan(p.x, p.y);
   float v = atan(p.z, p.w);
 
-  // Klein bottle surface
+  // Klein bottle surface - made thicker
   float r = 2.0 + cos(u);
   vec4 surface;
   surface.x = r * cos(u) * cos(v);
@@ -137,11 +141,11 @@ float kleinBottlePassage(vec4 p) {
   surface.z = r * cos(u) * sin(v);
   surface.w = r * sin(u) * sin(v) + sin(u * 2.0); // 4D twist
 
-  float dist = length(p - surface);
+  float dist = length(p - surface) * 0.8; // Thicker
 
   // Add passage holes
   float holes = sin(u * 6.0) * sin(v * 4.0);
-  dist -= holes * 0.2;
+  dist -= holes * 0.3;
 
   // Eroded surface
   dist += fbm4d(p * 2.0) * 0.15;
@@ -152,20 +156,24 @@ float kleinBottlePassage(vec4 p) {
 // HYPERBOLIC ARCHITECTURE
 // Curved negative-space chambers in 4D
 float hyperbolicChambers(vec4 p) {
-  p *= rotYZ(uTime * 0.18);
+  // Gentle rotation
+  p *= rotYZ(uTime * 0.09);
 
-  // Hyperbolic tiling pattern
+  // Scale to make larger
+  p *= 0.4;
+
+  // Hyperbolic tiling pattern - larger cells
   vec4 q = p;
-  q.xy = abs(fract(q.xy / 3.0) - 0.5) * 3.0;
-  q.zw = abs(fract(q.zw / 3.0) - 0.5) * 3.0;
+  q.xy = abs(fract(q.xy / 4.0) - 0.5) * 4.0;
+  q.zw = abs(fract(q.zw / 4.0) - 0.5) * 4.0;
 
-  // Hyperbolic surfaces
-  float hyp = length(q.xy) * length(q.zw) - 1.5;
+  // Hyperbolic surfaces - thicker
+  float hyp = length(q.xy) * length(q.zw) - 2.0;
 
-  // Architectural details - columns
-  vec4 cols = abs(fract(p / 1.5) - 0.5) * 1.5;
-  float columns = length(cols.xy) - 0.15;
-  columns = min(columns, length(cols.zw) - 0.15);
+  // Architectural details - thicker columns
+  vec4 cols = abs(fract(p / 2.0) - 0.5) * 2.0;
+  float columns = length(cols.xy) - 0.25;
+  columns = min(columns, length(cols.zw) - 0.25);
 
   float arch = max(hyp, -columns);
 
@@ -178,14 +186,18 @@ float hyperbolicChambers(vec4 p) {
 // RECURSIVE TESSERACT CATACOMBS
 // Nested hypercubes forming burial chambers
 float tesseractCatacombs(vec4 p) {
-  p *= rotXW(uTime * 0.12);
-  p *= rotZW(-uTime * 0.17);
+  // Gentle rotation
+  p *= rotXW(uTime * 0.06);
+  p *= rotZW(-uTime * 0.08);
+
+  // Scale to make larger
+  p *= 0.35;
 
   float catacombs = MAX_DIST;
 
-  // Multiple nested tesseracts
+  // Multiple nested tesseracts - larger scales
   for(int i = 0; i < 3; i++) {
-    float scale = 2.5 - float(i) * 0.8;
+    float scale = 3.5 - float(i) * 1.0;
     vec4 q = p;
 
     // Tesseract distance field
@@ -193,15 +205,15 @@ float tesseractCatacombs(vec4 p) {
     float tesseract = min(max(max(max(d.x, d.y), d.z), d.w), 0.0) +
                       length(max(d, 0.0));
 
-    // Make it hollow (burial chambers)
-    tesseract = abs(tesseract) - 0.2;
+    // Make it hollow (burial chambers) - thicker walls
+    tesseract = abs(tesseract) - 0.3;
 
     catacombs = min(catacombs, tesseract);
   }
 
-  // Add skeletal structures inside chambers
+  // Add skeletal structures inside chambers - thicker bones
   vec4 bones = abs(fract(p * 0.5) - 0.5) * 2.0;
-  float skeleton = min(length(bones.xy), length(bones.zw)) - 0.08;
+  float skeleton = min(length(bones.xy), length(bones.zw)) - 0.12;
 
   catacombs = min(catacombs, skeleton);
 
@@ -366,19 +378,17 @@ void main() {
 
   vec3 rd3d = normalize(uv.x * uu + uv.y * vv + 2.0 * ww);
 
-  // Convert to 4D - keep W dimension controlled
-  vec4 ro = vec4(ro3d, cos(uTime * 0.1) * 1.0); // Gentle W movement
+  // Convert to 4D - W stays near 0 so geometry stays visible
+  vec4 ro = vec4(ro3d, 0.0);
   vec4 rd = vec4(rd3d, 0.0);
 
-  // Gentler 4D rotations
-  float t = uTime * 0.05;
-  rd = rotXW(t) * rd;
-  rd = rotYZ(t * 0.8) * rd;
+  // NO 4D ray rotations - they make geometry disappear
+  // The structures themselves rotate, that's enough
 
   float d = rayMarch(ro, rd);
 
-  // Brighter atmospheric background with depth-based glow
-  vec3 col = VOID_PURPLE * 0.4 + ELECTRIC_CYAN * 0.1;
+  // Back to darker atmospheric background
+  vec3 col = VOID_PURPLE * 0.15;
 
   if(d < MAX_DIST) {
     vec4 p = ro + rd * d;
@@ -407,9 +417,9 @@ void main() {
     }
     ao = max(ao, 0.0);
 
-    // Combine lighting - much brighter ambient
-    float lighting = 0.5 + diff1 * 0.8 + diff2 * 0.4 + wLight;
-    col *= lighting * (0.6 + ao * 0.4); // Softer AO influence
+    // Combine lighting - balanced
+    float lighting = 0.3 + diff1 * 0.7 + diff2 * 0.3 + wLight;
+    col *= lighting * ao;
 
     // Specular highlights on bone
     vec4 viewDir = normalize(-rd);
@@ -426,13 +436,8 @@ void main() {
     col += MARROW_RED * sss * 0.15;
   }
 
-  // Atmospheric depth - brighter and less aggressive
-  vec3 atmosphere = VOID_PURPLE * 0.5 + ELECTRIC_CYAN * 0.15;
-  col = mix(col, atmosphere, 1.0 - exp(-d * 0.05));
-
-  // Add volumetric glow to prevent total blackness
-  float volumetricGlow = exp(-d * 0.1) * 0.3;
-  col += (ELECTRIC_CYAN * 0.3 + BONE_WHITE * 0.2) * volumetricGlow;
+  // Atmospheric depth
+  col = mix(col, VOID_PURPLE * 0.2, 1.0 - exp(-d * 0.08));
 
   // Dimensional flickering
   col *= 0.95 + 0.05 * sin(uTime * 15.0 + uv.y * 50.0);
@@ -440,10 +445,6 @@ void main() {
   // Subtle vignette
   float vignette = 1.0 - length(uv) * 0.3;
   col *= vignette;
-
-  // ABSOLUTE MINIMUM BRIGHTNESS - screen should NEVER go completely black
-  vec3 minBrightness = VOID_PURPLE * 0.3 + ELECTRIC_CYAN * 0.1 + BONE_WHITE * 0.05;
-  col = max(col, minBrightness);
 
   gl_FragColor = vec4(col, 1.0);
 }
