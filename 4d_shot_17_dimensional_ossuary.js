@@ -327,12 +327,12 @@ vec3 getMaterial(vec4 p, vec4 n) {
 void main() {
   vec2 uv = (gl_FragCoord.xy - 0.5 * uResolution.xy) / min(uResolution.x, uResolution.y);
 
-  // Camera movement through the ossuary
+  // Camera movement through the ossuary - keep distance to avoid phasing through
   float camTime = uTime * 0.2;
   vec3 ro3d = vec3(
-    6.0 * sin(camTime),
-    3.0 * sin(camTime * 0.7),
-    6.0 * cos(camTime)
+    10.0 * sin(camTime),
+    5.0 * sin(camTime * 0.7),
+    10.0 * cos(camTime)
   );
 
   vec3 ta3d = vec3(0.0, 0.0, 0.0);
@@ -353,7 +353,9 @@ void main() {
   rd = rotYZ(t * 1.3) * rd;
 
   float d = rayMarch(ro, rd);
-  vec3 col = VOID_PURPLE * 0.1; // Dark void background
+
+  // Brighter atmospheric background with depth-based glow
+  vec3 col = VOID_PURPLE * 0.4 + ELECTRIC_CYAN * 0.1;
 
   if(d < MAX_DIST) {
     vec4 p = ro + rd * d;
@@ -382,9 +384,9 @@ void main() {
     }
     ao = max(ao, 0.0);
 
-    // Combine lighting
-    float lighting = 0.15 + diff1 * 0.6 + diff2 * 0.25 + wLight;
-    col *= lighting * ao;
+    // Combine lighting - much brighter ambient
+    float lighting = 0.5 + diff1 * 0.8 + diff2 * 0.4 + wLight;
+    col *= lighting * (0.6 + ao * 0.4); // Softer AO influence
 
     // Specular highlights on bone
     vec4 viewDir = normalize(-rd);
@@ -401,8 +403,13 @@ void main() {
     col += MARROW_RED * sss * 0.15;
   }
 
-  // Atmospheric depth
-  col = mix(col, VOID_PURPLE * 0.2, 1.0 - exp(-d * 0.08));
+  // Atmospheric depth - brighter and less aggressive
+  vec3 atmosphere = VOID_PURPLE * 0.5 + ELECTRIC_CYAN * 0.15;
+  col = mix(col, atmosphere, 1.0 - exp(-d * 0.05));
+
+  // Add volumetric glow to prevent total blackness
+  float volumetricGlow = exp(-d * 0.1) * 0.3;
+  col += (ELECTRIC_CYAN * 0.3 + BONE_WHITE * 0.2) * volumetricGlow;
 
   // Dimensional flickering
   col *= 0.95 + 0.05 * sin(uTime * 15.0 + uv.y * 50.0);
