@@ -327,15 +327,38 @@ vec3 getMaterial(vec4 p, vec4 n) {
 void main() {
   vec2 uv = (gl_FragCoord.xy - 0.5 * uResolution.xy) / min(uResolution.x, uResolution.y);
 
-  // Camera movement through the ossuary - keep distance to avoid phasing through
-  float camTime = uTime * 0.2;
-  vec3 ro3d = vec3(
-    10.0 * sin(camTime),
-    5.0 * sin(camTime * 0.7),
-    10.0 * cos(camTime)
-  );
+  // Camera movement - multiple shot types that ALWAYS show geometry
+  float camTime = uTime * 0.15;
+  float shotCycle = mod(camTime, 40.0);
 
-  vec3 ta3d = vec3(0.0, 0.0, 0.0);
+  vec3 ro3d, ta3d;
+
+  if(shotCycle < 10.0) {
+    // Shot 1: Wide orbit showing Klein bottle
+    float t = shotCycle / 10.0;
+    float angle = t * 6.28;
+    ro3d = vec3(12.0 * cos(angle), 4.0, 12.0 * sin(angle));
+    ta3d = vec3(0.0, 0.0, 0.0);
+  } else if(shotCycle < 20.0) {
+    // Shot 2: Close approach to hyperbolic chambers
+    float t = (shotCycle - 10.0) / 10.0;
+    float angle = t * 3.14;
+    ro3d = vec3(8.0 * cos(angle), 2.0 + sin(t * 6.28) * 2.0, 8.0 * sin(angle));
+    ta3d = vec3(2.0 * cos(angle * 2.0), 0.0, 2.0 * sin(angle * 2.0));
+  } else if(shotCycle < 30.0) {
+    // Shot 3: Circling tesseract catacombs
+    float t = (shotCycle - 20.0) / 10.0;
+    float angle = t * 6.28 * 1.5;
+    ro3d = vec3(9.0 * sin(angle), 3.0 * cos(t * 3.14), 9.0 * cos(angle));
+    ta3d = vec3(0.0, 0.0, 0.0);
+  } else {
+    // Shot 4: Slow pullback revealing everything
+    float t = (shotCycle - 30.0) / 10.0;
+    float angle = t * 6.28;
+    float dist = 10.0 + t * 5.0;
+    ro3d = vec3(dist * cos(angle), 5.0 + t * 3.0, dist * sin(angle));
+    ta3d = vec3(0.0, 0.0, 0.0);
+  }
 
   vec3 ww = normalize(ta3d - ro3d);
   vec3 uu = normalize(cross(vec3(0.0, 1.0, 0.0), ww));
@@ -343,14 +366,14 @@ void main() {
 
   vec3 rd3d = normalize(uv.x * uu + uv.y * vv + 2.0 * ww);
 
-  // Convert to 4D
-  vec4 ro = vec4(ro3d, sin(uTime * 0.15) * 2.0); // W dimension moves
+  // Convert to 4D - keep W dimension controlled
+  vec4 ro = vec4(ro3d, cos(uTime * 0.1) * 1.0); // Gentle W movement
   vec4 rd = vec4(rd3d, 0.0);
 
-  // Apply 4D rotations to ray
-  float t = uTime * 0.1;
+  // Gentler 4D rotations
+  float t = uTime * 0.05;
   rd = rotXW(t) * rd;
-  rd = rotYZ(t * 1.3) * rd;
+  rd = rotYZ(t * 0.8) * rd;
 
   float d = rayMarch(ro, rd);
 
@@ -417,6 +440,10 @@ void main() {
   // Subtle vignette
   float vignette = 1.0 - length(uv) * 0.3;
   col *= vignette;
+
+  // ABSOLUTE MINIMUM BRIGHTNESS - screen should NEVER go completely black
+  vec3 minBrightness = VOID_PURPLE * 0.3 + ELECTRIC_CYAN * 0.1 + BONE_WHITE * 0.05;
+  col = max(col, minBrightness);
 
   gl_FragColor = vec4(col, 1.0);
 }
