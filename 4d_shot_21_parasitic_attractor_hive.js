@@ -490,10 +490,10 @@ function fragmentShader() {
       float fogDensity = 0.0;
 
       const int SAMPLES = 4;
-      float step = marchDist / float(SAMPLES);
+      float stepSize = marchDist / float(SAMPLES);
 
       for (int i = 0; i < SAMPLES; i++) {
-        float t = float(i) * step;
+        float t = float(i) * stepSize;
         vec3 p = ro + rd * t;
 
         // Check proximity to entities for fog color
