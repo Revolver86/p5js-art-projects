@@ -398,8 +398,12 @@ function fragmentShader() {
 
       // Check synaptic arcs
       int arcCount = 0;
-      for (int i = 0; i < NUM_ENTITIES && arcCount < MAX_SYNAPSES; i++) {
-        for (int j = i + 1; j < NUM_ENTITIES && arcCount < MAX_SYNAPSES; j++) {
+      for (int i = 0; i < NUM_ENTITIES; i++) {
+        if (arcCount >= MAX_SYNAPSES) break;
+        for (int j = 0; j < NUM_ENTITIES; j++) {
+          if (j <= i) continue;  // Only check j > i to avoid duplicates
+          if (arcCount >= MAX_SYNAPSES) break;
+
           Attractor5D ent1 = getEntity(i, time);
           Attractor5D ent2 = getEntity(j, time);
           vec3 pos1 = ent1.pos.xyz * ent1.scale;
@@ -523,7 +527,9 @@ function fragmentShader() {
         // Synaptic regions - cyan glow
         float synapseGlow = 0.0;
         for (int j = 0; j < NUM_ENTITIES; j++) {
-          for (int k = j + 1; k < NUM_ENTITIES; k++) {
+          for (int k = 0; k < NUM_ENTITIES; k++) {
+            if (k <= j) continue;  // Only check k > j to avoid duplicates
+
             Attractor5D ent1 = getEntity(j, time);
             Attractor5D ent2 = getEntity(k, time);
             vec3 pos1 = ent1.pos.xyz * ent1.scale;
@@ -614,7 +620,9 @@ function fragmentShader() {
       // Synaptic flash overlay (random flicker)
       float flash = 0.0;
       for (int i = 0; i < NUM_ENTITIES; i++) {
-        for (int j = i + 1; j < NUM_ENTITIES; j++) {
+        for (int j = 0; j < NUM_ENTITIES; j++) {
+          if (j <= i) continue;  // Only check j > i to avoid duplicates
+
           Attractor5D ent1 = getEntity(i, time);
           Attractor5D ent2 = getEntity(j, time);
           vec3 pos1 = ent1.pos.xyz * ent1.scale;
