@@ -384,7 +384,7 @@ function fragmentShader() {
       vec3 rd = normalize(forward + tan(fov * 0.5) * (uv.x * right + uv.y * up));
 
       // Dynamic background
-      vec3 bgNebula = backgroundNebula(rd * 5.0, time);
+      float bgNebula = backgroundNebula(rd * 5.0, time);
       vec3 bgCol = mix(
         vec3(0.05, 0.02, 0.08),   // Deep purple
         vec3(0.12, 0.05, 0.15),   // Lighter purple
