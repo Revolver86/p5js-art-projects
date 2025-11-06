@@ -288,12 +288,14 @@ float organicEnvironment(vec4 p, float v) {
   floor += noise5d(p * 2.0, v) * 0.5;
   walls = floor;
 
-  // Membrane curtains hanging from above
+  // Membrane curtains hanging from above - pushed to background, much thinner
   vec4 memPos = p;
   memPos.y += 6.0;
-  memPos.xz = abs(fract(memPos.xz / 4.0) - 0.5) * 4.0;
+  // Larger spacing, pushed further out from center
+  memPos.xz = abs(fract(memPos.xz / 8.0) - 0.5) * 8.0;
 
-  float membrane = length(memPos.xz) - 0.8;
+  // Much thinner pillars - was 0.8, now 0.3
+  float membrane = length(memPos.xz) - 0.3;
   membrane += sin(memPos.y * 3.0 + uTime + v) * 0.15;
   membrane = max(membrane, -p.y - 6.0); // Only hang down
 
@@ -403,12 +405,12 @@ vec3 getMaterial(vec4 p, vec4 n, float matID, float v) {
 void main() {
   vec2 uv = (gl_FragCoord.xy - 0.5 * uResolution.xy) / min(uResolution.x, uResolution.y);
 
-  // Camera orbits the creature, looking at torso center
+  // Camera orbits the creature, looking at torso center - zoomed out more
   float camAngle = uTime * 0.15;
   vec3 ro3d = vec3(
-    7.0 * cos(camAngle),
-    2.0 + sin(uTime * 0.3) * 1.5,
-    7.0 * sin(camAngle)
+    10.0 * cos(camAngle),
+    3.0 + sin(uTime * 0.3) * 1.5,
+    10.0 * sin(camAngle)
   );
   vec3 ta3d = vec3(0.0, 0.5, 0.0); // Look at creature center mass
 
