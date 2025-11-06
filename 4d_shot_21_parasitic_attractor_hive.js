@@ -196,7 +196,7 @@ function fragmentShader() {
       // Integrate forward based on species and time
       float t = time + ent.phase;
       float dt = 0.015;  // Integration step
-      int steps = int(t / dt) % 500;  // Cycle trajectory
+      int steps = int(mod(t / dt, 500.0));  // Cycle trajectory
 
       for (int i = 0; i < 500; i++) {
         if (i >= steps) break;
