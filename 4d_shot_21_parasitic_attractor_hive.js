@@ -52,14 +52,14 @@ function fragmentShader() {
     #define TAU 6.28318530718
     #define PHI 1.618033988749895
 
-    #define MAX_STEPS 35
-    #define MAX_DIST 35.0
+    #define MAX_STEPS 28
+    #define MAX_DIST 30.0
     #define SURF_DIST 0.015
     #define EPSILON 0.001
 
-    #define NUM_ENTITIES 9
-    #define SYNAPSE_THRESHOLD 3.5
-    #define MAX_SYNAPSES 15
+    #define NUM_ENTITIES 5
+    #define SYNAPSE_THRESHOLD 4.5
+    #define MAX_SYNAPSES 10
 
     // Species IDs
     #define SPECIES_LORENZ 0
@@ -170,15 +170,12 @@ function fragmentShader() {
       float seed = float(id) * 123.456;
 
       // Assign species
-      if (id < 5) {
-        ent.species = SPECIES_LORENZ;  // 5 Lorenz butterflies
-        ent.scale = 0.18 + hash(seed) * 0.08;
-      } else if (id < 8) {
-        ent.species = SPECIES_ROSSLER;  // 3 Rössler spirals
-        ent.scale = 0.25 + hash(seed + 1.0) * 0.1;
+      if (id < 3) {
+        ent.species = SPECIES_LORENZ;  // 3 Lorenz butterflies
+        ent.scale = 0.22 + hash(seed) * 0.1;
       } else {
-        ent.species = SPECIES_HENON;  // 1 Hénon boomerang
-        ent.scale = 0.15 + hash(seed + 2.0) * 0.05;
+        ent.species = SPECIES_ROSSLER;  // 2 Rössler spirals
+        ent.scale = 0.3 + hash(seed + 1.0) * 0.12;
       }
 
       // Initialize position with unique starting point
@@ -195,19 +192,17 @@ function fragmentShader() {
 
       // Integrate forward based on species and time
       float t = time + ent.phase;
-      float dt = 0.015;  // Integration step
-      int steps = int(mod(t / dt, 500.0));  // Cycle trajectory
+      float dt = 0.02;  // Integration step (larger = faster, less accurate)
+      int steps = int(mod(t / dt, 150.0));  // Cycle trajectory (reduced from 500)
 
-      for (int i = 0; i < 500; i++) {
+      for (int i = 0; i < 150; i++) {
         if (i >= steps) break;
 
         float vOut;
         if (ent.species == SPECIES_LORENZ) {
           ent.pos = integrate5DLorenz(ent.pos, ent.v, dt, vOut);
-        } else if (ent.species == SPECIES_ROSSLER) {
-          ent.pos = integrate5DRossler(ent.pos, ent.v, dt, vOut);
         } else {
-          ent.pos = integrate5DHenon(ent.pos, ent.v, dt, vOut);
+          ent.pos = integrate5DRossler(ent.pos, ent.v, dt, vOut);
         }
         ent.v = vOut;
       }
@@ -259,17 +254,17 @@ function fragmentShader() {
         lookAt = vec3(0.0, 0.0, 0.0);
 
       } else if (t < 42.0) {
-        // Shot 4: Hénon Boomerang Chase (32-42s)
+        // Shot 4: Lorenz Butterfly Chase (32-42s)
         float s = (t - 32.0) / 10.0;
-        Attractor5D henon = getEntity(8, time);  // Hénon entity
-        vec3 henonPos = henon.pos.xyz * henon.scale;
+        Attractor5D lorenz = getEntity(2, time);  // Lorenz entity
+        vec3 lorenzPos = lorenz.pos.xyz * lorenz.scale;
         vec3 chaseOffset = vec3(
-          -cos(s * TAU * 2.0) * 3.0,
-          sin(s * TAU * 3.0) * 2.0,
-          -4.0 + sin(s * PI) * 2.0
+          -cos(s * TAU * 2.0) * 3.5,
+          sin(s * TAU * 3.0) * 2.5,
+          -4.5 + sin(s * PI) * 2.0
         );
-        ro = henonPos + chaseOffset;
-        lookAt = henonPos + vec3(sin(time * 2.0), 0.0, cos(time * 2.0)) * 0.3;
+        ro = lorenzPos + chaseOffset;
+        lookAt = lorenzPos + vec3(sin(time * 2.0), 0.0, cos(time * 2.0)) * 0.3;
 
       } else if (t < 50.0) {
         // Shot 5: Wide Ecosystem Shot (42-50s)
@@ -286,7 +281,7 @@ function fragmentShader() {
       } else {
         // Shot 6: Rössler Spiral Encounter (50-60s)
         float s = (t - 50.0) / 10.0;
-        Attractor5D rossler = getEntity(5, time);  // Rössler entity
+        Attractor5D rossler = getEntity(3, time);  // Rössler entity
         vec3 rosslerPos = rossler.pos.xyz * rossler.scale;
         float orbitAngle = s * TAU;
         vec3 orbitOffset = vec3(
@@ -494,7 +489,7 @@ function fragmentShader() {
       vec3 fogColor = vec3(0.0);
       float fogDensity = 0.0;
 
-      const int SAMPLES = 7;
+      const int SAMPLES = 4;
       float step = marchDist / float(SAMPLES);
 
       for (int i = 0; i < SAMPLES; i++) {
@@ -524,24 +519,9 @@ function fragmentShader() {
           regionColor = vec3(0.15, 0.05, 0.2);
         }
 
-        // Synaptic regions - cyan glow
-        float synapseGlow = 0.0;
-        for (int j = 0; j < NUM_ENTITIES; j++) {
-          for (int k = 0; k < NUM_ENTITIES; k++) {
-            if (k <= j) continue;  // Only check k > j to avoid duplicates
-
-            Attractor5D ent1 = getEntity(j, time);
-            Attractor5D ent2 = getEntity(k, time);
-            vec3 pos1 = ent1.pos.xyz * ent1.scale;
-            vec3 pos2 = ent2.pos.xyz * ent2.scale;
-
-            if (length(pos1 - pos2) < SYNAPSE_THRESHOLD) {
-              vec3 midpoint = (pos1 + pos2) * 0.5;
-              float distToArc = length(p - midpoint);
-              synapseGlow += exp(-distToArc * 0.5) * 0.3;
-            }
-          }
-        }
+        // Simplified synaptic glow (less expensive)
+        float synapseGlow = noise(p * 0.3 + time * 0.5) * 0.2;
+        synapseGlow *= step(minDist, SYNAPSE_THRESHOLD);  // Only in dense regions
         regionColor += vec3(0.094, 0.639, 0.710) * synapseGlow;
 
         // Accumulate fog
@@ -617,29 +597,10 @@ function fragmentShader() {
       float vignette = 1.0 - length(uv) * 0.3;
       col *= vignette;
 
-      // Synaptic flash overlay (random flicker)
-      float flash = 0.0;
-      for (int i = 0; i < NUM_ENTITIES; i++) {
-        for (int j = 0; j < NUM_ENTITIES; j++) {
-          if (j <= i) continue;  // Only check j > i to avoid duplicates
-
-          Attractor5D ent1 = getEntity(i, time);
-          Attractor5D ent2 = getEntity(j, time);
-          vec3 pos1 = ent1.pos.xyz * ent1.scale;
-          vec3 pos2 = ent2.pos.xyz * ent2.scale;
-
-          if (length(pos1 - pos2) < SYNAPSE_THRESHOLD) {
-            float flickerTime = time * 10.0 + float(i * 100 + j);
-            if (fract(hash(floor(flickerTime))) > 0.8) {
-              vec3 midpoint = (pos1 + pos2) * 0.5;
-              vec3 screenDir = normalize(midpoint - ro);
-              float flashIntensity = max(dot(rd, screenDir), 0.0);
-              flash += pow(flashIntensity, 20.0) * 0.3;
-            }
-          }
-        }
-      }
-      col += vec3(0.094, 0.639, 0.710) * flash;
+      // Simplified synaptic flash (less expensive)
+      float flash = sin(time * 5.0 + hash(floor(time * 2.0)) * TAU) * 0.5 + 0.5;
+      flash *= step(0.8, fract(hash(floor(time * 3.0))));  // Random flicker
+      col += vec3(0.094, 0.639, 0.710) * flash * 0.05;
 
       // Tone mapping
       col = col / (col + 1.0);
