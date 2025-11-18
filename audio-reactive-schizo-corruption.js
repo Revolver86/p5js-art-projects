@@ -25,14 +25,227 @@ let chaosAccum = 0;
 let tearAccum = 0;
 let corruptionAccum = 0;
 
+// Vertex shader
+const vertShader = `
+attribute vec3 aPosition;
+attribute vec2 aTexCoord;
+
+varying vec2 vTexCoord;
+
+void main() {
+  vTexCoord = aTexCoord;
+  vec4 positionVec4 = vec4(aPosition, 1.0);
+  positionVec4.xy = positionVec4.xy * 2.0 - 1.0;
+  gl_Position = positionVec4;
+}
+`;
+
+// Fragment shader
+const fragShader = `
+precision highp float;
+
+varying vec2 vTexCoord;
+
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform float u_bass;
+uniform float u_lowMid;
+uniform float u_mid;
+uniform float u_highMid;
+uniform float u_treble;
+uniform float u_amplitude;
+uniform float u_chaos;
+uniform float u_tear;
+uniform float u_corruption;
+uniform sampler2D u_feedbackTex;
+
+float hash(float n) {
+    return fract(sin(n) * 43758.5453123);
+}
+
+float hash2(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+
+    float a = hash2(i);
+    float b = hash2(i + vec2(1.0, 0.0));
+    float c = hash2(i + vec2(0.0, 1.0));
+    float d = hash2(i + vec2(1.0, 1.0));
+
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float fbm(vec2 p) {
+    float value = 0.0;
+    float amplitude = 0.5;
+    float frequency = 1.0;
+
+    for (int i = 0; i < 5; i++) {
+        value += amplitude * noise(p * frequency);
+        frequency *= 2.0;
+        amplitude *= 0.5;
+    }
+    return value;
+}
+
+float noise3d(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+
+    float n = i.x + i.y * 57.0 + i.z * 113.0;
+
+    return mix(
+        mix(mix(hash(n), hash(n + 1.0), f.x),
+            mix(hash(n + 57.0), hash(n + 58.0), f.x), f.y),
+        mix(mix(hash(n + 113.0), hash(n + 114.0), f.x),
+            mix(hash(n + 170.0), hash(n + 171.0), f.x), f.y),
+        f.z);
+}
+
+vec3 chromaticAberration(vec2 uv, float amount) {
+    float r = fbm(uv * 20.0 + u_time * 0.3 + u_bass * 5.0);
+    float g = fbm(uv * 20.0 + u_time * 0.3 + u_mid * 3.0);
+    float b = fbm(uv * 20.0 + u_time * 0.3 + u_treble * 7.0);
+
+    vec2 rOffset = vec2(cos(u_time + u_bass * 10.0), sin(u_time + u_bass * 10.0)) * amount * u_bass;
+    vec2 bOffset = vec2(cos(u_time + u_treble * 15.0), sin(u_time + u_treble * 15.0)) * amount * u_treble;
+
+    return vec3(r + rOffset.x, g, b + bOffset.x);
+}
+
+vec2 glitchDisplace(vec2 uv) {
+    float tear = step(0.98, noise(vec2(uv.y * 50.0 + u_time * 2.0, u_tear)));
+    float tearOffset = tear * (hash(floor(uv.y * 50.0)) - 0.5) * u_bass * 0.5;
+
+    float fracture = step(0.97, noise(vec2(uv.x * 40.0 + u_time * 3.0, u_mid * 10.0)));
+    float fractureOffset = fracture * (hash(floor(uv.x * 40.0)) - 0.5) * u_mid * 0.3;
+
+    vec2 chaosDisplace = vec2(
+        noise(vec2(uv.x * 30.0, u_time + u_treble * 20.0)) - 0.5,
+        noise(vec2(uv.y * 30.0, u_time + u_highMid * 15.0)) - 0.5
+    ) * u_treble * 0.1;
+
+    return uv + vec2(tearOffset, fractureOffset) + chaosDisplace;
+}
+
+vec3 dataCorrupt(vec3 color, vec2 uv) {
+    float pixelSize = mix(1.0, 50.0, u_corruption * u_treble);
+    vec2 pixelatedUV = floor(uv * u_resolution / pixelSize) * pixelSize / u_resolution;
+
+    float bitDepth = mix(256.0, 4.0, u_corruption * u_highMid);
+    color = floor(color * bitDepth) / bitDepth;
+
+    float pixelDeath = step(0.99, noise(pixelatedUV * 100.0 + u_time * 5.0));
+    color *= (1.0 - pixelDeath * u_corruption);
+
+    return color;
+}
+
+vec3 colorDestroy(vec3 color) {
+    float levels = mix(32.0, 3.0, u_bass * u_chaos);
+    color = floor(color * levels) / levels;
+
+    if (mod(u_time * u_mid * 10.0, 3.0) < 1.0) {
+        color = color.gbr;
+    } else if (mod(u_time * u_mid * 10.0, 3.0) < 2.0) {
+        color = color.brg;
+    }
+
+    float invertChance = step(0.7, u_amplitude) * step(0.95, noise(vec2(u_time * 2.0, 0.0)));
+    color = mix(color, 1.0 - color, invertChance);
+
+    return color;
+}
+
+vec3 feedbackChaos(vec2 uv, vec3 currentColor) {
+    vec2 fbUV = uv;
+    fbUV += vec2(
+        noise(vec2(u_time * 0.5 + u_bass * 5.0, uv.y * 10.0)) - 0.5,
+        noise(vec2(u_time * 0.5 + u_mid * 5.0, uv.x * 10.0)) - 0.5
+    ) * 0.02 * u_chaos;
+
+    vec3 feedback = texture2D(u_feedbackTex, fbUV).rgb;
+
+    float feedbackAmount = u_amplitude * 0.7;
+    return mix(currentColor, feedback, feedbackAmount);
+}
+
+void main() {
+    vec2 uv = vTexCoord;
+
+    vec2 displaceUV = glitchDisplace(uv);
+
+    vec3 color = vec3(0.0);
+
+    float bassWave = sin(displaceUV.x * 5.0 + u_time + u_bass * 20.0) *
+                     cos(displaceUV.y * 5.0 + u_time + u_bass * 15.0);
+    color.r = bassWave * u_bass * 2.0;
+
+    vec2 midCoord = displaceUV * 10.0 + vec2(u_time * 0.5, u_time * 0.3);
+    float midNoise = fbm(midCoord + u_mid * 10.0);
+    color.g = midNoise * u_mid * 3.0;
+
+    vec3 trebleCoord = vec3(displaceUV * 50.0, u_time * 2.0 + u_treble * 30.0);
+    float trebleNoise = noise3d(trebleCoord);
+    color.b = trebleNoise * u_treble * 4.0;
+
+    vec3 aberration = chromaticAberration(displaceUV, 0.05);
+    color += aberration * u_amplitude;
+
+    float chaosNoise = fbm(displaceUV * 20.0 + u_time + u_chaos);
+    color += chaosNoise * u_chaos * 0.5;
+
+    color = feedbackChaos(uv, color);
+
+    color = dataCorrupt(color, uv);
+
+    color = colorDestroy(color);
+
+    float scanline = sin(uv.y * u_resolution.y * 2.0 + u_time * 10.0) * 0.05 * u_lowMid;
+    color += scanline;
+
+    vec2 splitOffset = vec2(u_bass * 0.03, u_treble * 0.03);
+    float splitR = fbm((uv + splitOffset) * 15.0 + u_time);
+    float splitB = fbm((uv - splitOffset) * 15.0 + u_time);
+    color.r += splitR * u_bass;
+    color.b += splitB * u_treble;
+
+    float vignette = length(uv - 0.5);
+    vignette = 1.0 - smoothstep(0.3, 0.8 + u_amplitude * 0.3, vignette);
+    color *= vignette;
+
+    float edge = abs(dFdx(color.r)) + abs(dFdy(color.r)) +
+                 abs(dFdx(color.g)) + abs(dFdy(color.g)) +
+                 abs(dFdx(color.b)) + abs(dFdy(color.b));
+    color += edge * u_chaos * 2.0;
+
+    if (u_amplitude > 0.7 && u_chaos > 2.0) {
+        float destruction = noise3d(vec3(uv * 100.0, u_time * 10.0));
+        color = mix(color, vec3(destruction), 0.3);
+    }
+
+    color = clamp(color, 0.0, 2.0);
+
+    gl_FragColor = vec4(color, 1.0);
+}
+`;
+
 function preload() {
   song = loadSound('DEMO2.m4a');
-  corruptionShader = loadShader('corruption.vert', 'corruption.frag');
 }
 
 function setup() {
   createCanvas(windowWidth, windowHeight, WEBGL);
   pixelDensity(1);
+
+  // Create shader from embedded strings
+  corruptionShader = createShader(vertShader, fragShader);
 
   // Audio analysis
   fft = new p5.FFT(0.8, 1024);
