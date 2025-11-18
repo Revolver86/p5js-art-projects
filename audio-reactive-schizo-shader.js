@@ -389,8 +389,8 @@ function draw() {
     }
     glitchShader.setUniform('spectrum', spectrumPacked);
 
-    // Draw fullscreen quad
-    rect(0, 0, width, height);
+    // Draw fullscreen quad - WEBGL coordinates are centered
+    rect(-width/2, -height/2, width, height);
     pop();
 
     // Copy current frame to feedback buffer for next frame
