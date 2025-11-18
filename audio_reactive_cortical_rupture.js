@@ -2,7 +2,7 @@
 // Audio-reactive schizophrenic visual torture
 // The screen is a membrane being torn apart by sound
 
-let mic;
+let song;
 let fft;
 let amplitude;
 let glitchShader;
@@ -15,6 +15,7 @@ let highHistory = [];
 let glitchIntensity = 0;
 let tearForce = 0;
 let colorCorruption = 0;
+let isPlaying = false;
 
 // Vertex shader - standard passthrough
 const vertShader = `
@@ -168,19 +169,21 @@ void main() {
 }
 `;
 
+function preload() {
+  // Load the audio file
+  song = loadSound('DEMO2.m4a');
+}
+
 function setup() {
   createCanvas(windowWidth, windowHeight, WEBGL);
   pixelDensity(1);
 
   // Audio setup
-  mic = new p5.AudioIn();
-  mic.start();
-
   fft = new p5.FFT(0.8, 256);
-  fft.setInput(mic);
+  fft.setInput(song);
 
   amplitude = new p5.Amplitude();
-  amplitude.setInput(mic);
+  amplitude.setInput(song);
 
   // Shader setup
   glitchShader = createShader(vertShader, fragShader);
@@ -202,10 +205,22 @@ function setup() {
   }
 
   console.log("CORTICAL RUPTURE INITIALIZED");
-  console.log("Allow microphone access for audio reactivity");
+  console.log("Click anywhere to start the audio and visual destruction");
 }
 
 function draw() {
+  // Show prompt if not playing
+  if (!isPlaying) {
+    background(0);
+    fill(255, 0, 0);
+    textAlign(CENTER, CENTER);
+    textSize(32);
+    text("CLICK TO INITIATE CORTICAL RUPTURE", 0, 0);
+    textSize(16);
+    text("Audio will loop and tear reality apart", 0, 40);
+    return;
+  }
+
   // Analyze audio
   let spectrum = fft.analyze();
   let amp = amplitude.getLevel();
@@ -410,8 +425,15 @@ function windowResized() {
 }
 
 function mousePressed() {
-  // Click to add tear points
-  tearParticles.push(new TearParticle());
+  // Start/stop the song
+  if (!isPlaying) {
+    song.loop();
+    isPlaying = true;
+    console.log("AUDIO DESTRUCTION ENGAGED");
+  } else {
+    // Add tear points while playing
+    tearParticles.push(new TearParticle());
+  }
 }
 
 function keyPressed() {
