@@ -220,10 +220,9 @@ void main() {
     vignette = 1.0 - smoothstep(0.3, 0.8 + u_amplitude * 0.3, vignette);
     color *= vignette;
 
-    float edge = abs(dFdx(color.r)) + abs(dFdy(color.r)) +
-                 abs(dFdx(color.g)) + abs(dFdy(color.g)) +
-                 abs(dFdx(color.b)) + abs(dFdy(color.b));
-    color += edge * u_chaos * 2.0;
+    // High frequency noise injection for chaos
+    float highFreqChaos = noise3d(vec3(uv * 200.0, u_time * 5.0));
+    color += highFreqChaos * u_chaos * 0.3;
 
     if (u_amplitude > 0.7 && u_chaos > 2.0) {
         float destruction = noise3d(vec3(uv * 100.0, u_time * 10.0));
