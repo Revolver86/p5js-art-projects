@@ -5,7 +5,7 @@
 let song;
 let fft;
 let amplitude;
-let shader;
+let glitchShader;
 let feedbackBuffer;
 let mainBuffer;
 
@@ -243,7 +243,7 @@ function setup() {
     song.loop();
 
     // Create shader
-    shader = createShader(vertShader, fragShader);
+    glitchShader = createShader(vertShader, fragShader);
 
     // Create buffers
     feedbackBuffer = createGraphics(width, height, WEBGL);
@@ -267,7 +267,7 @@ function setup() {
 function draw() {
     // Analyze audio
     let spectrum = fft.analyze();
-    let waveform = fft.waveform();
+    let waveData = fft.waveform();
     let level = amplitude.getLevel();
 
     // Extract frequency bands
@@ -327,9 +327,9 @@ function draw() {
     mainBuffer.strokeWeight(2 + bass * 4);
     mainBuffer.noFill();
     mainBuffer.beginShape();
-    for (let i = 0; i < waveform.length; i += 4) {
-        let x = map(i, 0, waveform.length, -width/2, width/2);
-        let y = map(waveform[i], -1, 1, -height/4, height/4) * (1 + mid * 2);
+    for (let i = 0; i < waveData.length; i += 4) {
+        let x = map(i, 0, waveData.length, -width/2, width/2);
+        let y = map(waveData[i], -1, 1, -height/4, height/4) * (1 + mid * 2);
         mainBuffer.vertex(x, y);
     }
     mainBuffer.endShape();
@@ -357,25 +357,25 @@ function draw() {
 
     // Apply shader with audio data
     push();
-    shader(shader);
+    shader(glitchShader);
 
     // Set uniforms
-    shader.setUniform('tex0', mainBuffer);
-    shader.setUniform('feedbackTex', feedbackBuffer);
-    shader.setUniform('resolution', [width, height]);
-    shader.setUniform('time', millis() / 1000.0);
+    glitchShader.setUniform('tex0', mainBuffer);
+    glitchShader.setUniform('feedbackTex', feedbackBuffer);
+    glitchShader.setUniform('resolution', [width, height]);
+    glitchShader.setUniform('time', millis() / 1000.0);
 
     // Audio uniforms
-    shader.setUniform('bass', bass);
-    shader.setUniform('mid', mid);
-    shader.setUniform('treble', treble);
-    shader.setUniform('amp', level);
-    shader.setUniform('beat', beatDetect);
+    glitchShader.setUniform('bass', bass);
+    glitchShader.setUniform('mid', mid);
+    glitchShader.setUniform('treble', treble);
+    glitchShader.setUniform('amp', level);
+    glitchShader.setUniform('beat', beatDetect);
 
     // Chaos parameters driven by audio
-    shader.setUniform('glitchAmount', bass * 0.3 + beatDetect * 0.5);
-    shader.setUniform('corruption', mid * 0.7 + treble * 0.3);
-    shader.setUniform('pain', level * 1.5 + treble * 0.5);
+    glitchShader.setUniform('glitchAmount', bass * 0.3 + beatDetect * 0.5);
+    glitchShader.setUniform('corruption', mid * 0.7 + treble * 0.3);
+    glitchShader.setUniform('pain', level * 1.5 + treble * 0.5);
 
     // Pass spectrum as vec4 array (packing 4 values per uniform)
     let spectrumPacked = [];
@@ -387,7 +387,7 @@ function draw() {
             spectrum[i+3] / 255
         ]);
     }
-    shader.setUniform('spectrum', spectrumPacked);
+    glitchShader.setUniform('spectrum', spectrumPacked);
 
     // Draw fullscreen quad
     rect(0, 0, width, height);
