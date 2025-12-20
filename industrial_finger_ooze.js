@@ -6,6 +6,7 @@ let shaderProgram;
 let fingerTextures = [];
 let metalTextures = [];
 let oozeTextures = [];
+let fluidDataTexture;
 
 // Fluid particle system
 let fluidParticles = [];
@@ -14,6 +15,7 @@ const FLUID_VISCOSITY = 0.85;
 const SURFACE_TENSION = 0.3;
 const GRAVITY = 0.15;
 const FLUID_RADIUS = 1.2;
+const FLUID_TEX_SIZE = 16; // 16x16 = 256 particles max, using 120
 
 function preload() {
   // Load finger textures
@@ -81,6 +83,10 @@ function setup() {
     });
   }
 
+  // Create data texture for fluid particles
+  fluidDataTexture = createGraphics(FLUID_TEX_SIZE, FLUID_TEX_SIZE, WEBGL);
+  fluidDataTexture.pixelDensity(1);
+
   // Create custom shader
   shaderProgram = createShader(vertexShader(), fragmentShader());
 }
@@ -88,6 +94,9 @@ function setup() {
 function draw() {
   // Update fluid simulation
   updateFluidDynamics();
+
+  // Encode fluid particle positions into texture
+  updateFluidTexture();
 
   shader(shaderProgram);
 
@@ -102,12 +111,9 @@ function draw() {
   shaderProgram.setUniform('uCameraPos', [camX, camY, camZ]);
   shaderProgram.setUniform('uCameraTarget', [0.0, 0.0, 0.0]);
 
-  // Pass fluid particle positions
-  let fluidPositions = [];
-  for (let p of fluidParticles) {
-    fluidPositions.push(p.pos.x, p.pos.y, p.pos.z);
-  }
-  shaderProgram.setUniform('uFluidParticles', fluidPositions);
+  // Pass fluid data texture
+  shaderProgram.setUniform('uFluidData', fluidDataTexture);
+  shaderProgram.setUniform('uFluidTexSize', FLUID_TEX_SIZE);
   shaderProgram.setUniform('uNumFluidParticles', fluidParticles.length);
 
   // Pass textures
@@ -122,6 +128,31 @@ function draw() {
   }
 
   rect(0, 0, width, height);
+}
+
+function updateFluidTexture() {
+  fluidDataTexture.loadPixels();
+
+  // Clear texture
+  for (let i = 0; i < fluidDataTexture.pixels.length; i++) {
+    fluidDataTexture.pixels[i] = 0;
+  }
+
+  // Encode particle positions
+  for (let i = 0; i < fluidParticles.length; i++) {
+    let x = i % FLUID_TEX_SIZE;
+    let y = floor(i / FLUID_TEX_SIZE);
+    let idx = (y * FLUID_TEX_SIZE + x) * 4;
+
+    // Encode position as color (normalized to 0-255)
+    // Map world coords (-20 to 20) to 0-255
+    fluidDataTexture.pixels[idx + 0] = map(fluidParticles[i].pos.x, -20, 20, 0, 255);
+    fluidDataTexture.pixels[idx + 1] = map(fluidParticles[i].pos.y, -20, 20, 0, 255);
+    fluidDataTexture.pixels[idx + 2] = map(fluidParticles[i].pos.z, -20, 20, 0, 255);
+    fluidDataTexture.pixels[idx + 3] = 255;
+  }
+
+  fluidDataTexture.updatePixels();
 }
 
 function updateFluidDynamics() {
@@ -241,7 +272,8 @@ function fragmentShader() {
     uniform float uTime;
     uniform vec3 uCameraPos;
     uniform vec3 uCameraTarget;
-    uniform float uFluidParticles[360]; // 120 particles * 3 coords
+    uniform sampler2D uFluidData;
+    uniform float uFluidTexSize;
     uniform int uNumFluidParticles;
     uniform sampler2D uFingerTex0;
     uniform sampler2D uFingerTex1;
@@ -272,6 +304,16 @@ function fragmentShader() {
     #define MAX_DIST 100.0
     #define SURF_DIST 0.001
     #define NUM_FINGERS 24
+
+    // Get fluid particle position from texture
+    vec3 getFluidParticle(int index) {
+      float x = mod(float(index), uFluidTexSize);
+      float y = floor(float(index) / uFluidTexSize);
+      vec2 uv = (vec2(x, y) + 0.5) / uFluidTexSize;
+      vec3 encoded = texture2D(uFluidData, uv).rgb;
+      // Decode from 0-1 range back to -20 to 20
+      return encoded * 40.0 - 20.0;
+    }
 
     // Noise function
     float hash(vec3 p) {
@@ -389,12 +431,7 @@ function fragmentShader() {
       for (int i = 0; i < 120; i++) {
         if (i >= uNumFluidParticles) break;
 
-        int idx = i * 3;
-        vec3 particlePos = vec3(
-          uFluidParticles[idx],
-          uFluidParticles[idx + 1],
-          uFluidParticles[idx + 2]
-        );
+        vec3 particlePos = getFluidParticle(i);
 
         float dist = length(p - particlePos);
         // Metaball formula
