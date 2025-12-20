@@ -127,7 +127,9 @@ function draw() {
     shaderProgram.setUniform(`uOozeTex${i}`, oozeTextures[i]);
   }
 
-  rect(0, 0, width, height);
+  // Draw fullscreen quad (WEBGL mode centers at origin)
+  noStroke();
+  rect(-width/2, -height/2, width, height);
 }
 
 function updateFluidTexture() {
