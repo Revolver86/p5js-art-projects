@@ -116,14 +116,14 @@ function draw() {
   shaderProgram.setUniform('uFluidTexSize', FLUID_TEX_SIZE);
   shaderProgram.setUniform('uNumFluidParticles', fluidParticles.length);
 
-  // Pass textures
-  for (let i = 0; i < min(8, fingerTextures.length); i++) {
+  // Pass textures (limited to 4 each to stay under 16 sampler limit)
+  for (let i = 0; i < min(4, fingerTextures.length); i++) {
     shaderProgram.setUniform(`uFingerTex${i}`, fingerTextures[i]);
   }
-  for (let i = 0; i < min(8, metalTextures.length); i++) {
+  for (let i = 0; i < min(4, metalTextures.length); i++) {
     shaderProgram.setUniform(`uMetalTex${i}`, metalTextures[i]);
   }
-  for (let i = 0; i < min(8, oozeTextures.length); i++) {
+  for (let i = 0; i < min(4, oozeTextures.length); i++) {
     shaderProgram.setUniform(`uOozeTex${i}`, oozeTextures[i]);
   }
 
@@ -279,26 +279,14 @@ function fragmentShader() {
     uniform sampler2D uFingerTex1;
     uniform sampler2D uFingerTex2;
     uniform sampler2D uFingerTex3;
-    uniform sampler2D uFingerTex4;
-    uniform sampler2D uFingerTex5;
-    uniform sampler2D uFingerTex6;
-    uniform sampler2D uFingerTex7;
     uniform sampler2D uMetalTex0;
     uniform sampler2D uMetalTex1;
     uniform sampler2D uMetalTex2;
     uniform sampler2D uMetalTex3;
-    uniform sampler2D uMetalTex4;
-    uniform sampler2D uMetalTex5;
-    uniform sampler2D uMetalTex6;
-    uniform sampler2D uMetalTex7;
     uniform sampler2D uOozeTex0;
     uniform sampler2D uOozeTex1;
     uniform sampler2D uOozeTex2;
     uniform sampler2D uOozeTex3;
-    uniform sampler2D uOozeTex4;
-    uniform sampler2D uOozeTex5;
-    uniform sampler2D uOozeTex6;
-    uniform sampler2D uOozeTex7;
 
     #define MAX_STEPS 150
     #define MAX_DIST 100.0
@@ -535,7 +523,7 @@ function fragmentShader() {
 
         if (finger < d) {
           d = finger;
-          matID = 2.0 + mod(i, 8.0); // Finger textures
+          matID = 2.0 + mod(i, 4.0); // Finger textures
         }
       }
 
@@ -578,40 +566,28 @@ function fragmentShader() {
     vec3 getMaterial(vec3 p, vec3 n, float matID) {
       // Metal architecture
       if (matID < 1.5) {
-        int texIdx = int(mod(p.x * 0.2 + p.z * 0.3, 8.0));
+        int texIdx = int(mod(p.x * 0.2 + p.z * 0.3, 4.0));
         if (texIdx == 0) return triplanarMap(uMetalTex0, p, n);
         if (texIdx == 1) return triplanarMap(uMetalTex1, p, n);
         if (texIdx == 2) return triplanarMap(uMetalTex2, p, n);
-        if (texIdx == 3) return triplanarMap(uMetalTex3, p, n);
-        if (texIdx == 4) return triplanarMap(uMetalTex4, p, n);
-        if (texIdx == 5) return triplanarMap(uMetalTex5, p, n);
-        if (texIdx == 6) return triplanarMap(uMetalTex6, p, n);
-        return triplanarMap(uMetalTex7, p, n);
+        return triplanarMap(uMetalTex3, p, n);
       }
 
       // Fingers
       if (matID >= 2.0 && matID < 10.0) {
-        int texIdx = int(matID - 2.0);
+        int texIdx = int(mod(matID - 2.0, 4.0));
         if (texIdx == 0) return triplanarMap(uFingerTex0, p, n);
         if (texIdx == 1) return triplanarMap(uFingerTex1, p, n);
         if (texIdx == 2) return triplanarMap(uFingerTex2, p, n);
-        if (texIdx == 3) return triplanarMap(uFingerTex3, p, n);
-        if (texIdx == 4) return triplanarMap(uFingerTex4, p, n);
-        if (texIdx == 5) return triplanarMap(uFingerTex5, p, n);
-        if (texIdx == 6) return triplanarMap(uFingerTex6, p, n);
-        return triplanarMap(uFingerTex7, p, n);
+        return triplanarMap(uFingerTex3, p, n);
       }
 
       // Ooze
-      int texIdx = int(mod(p.x + p.y * 2.0 + p.z, 8.0));
+      int texIdx = int(mod(p.x + p.y * 2.0 + p.z, 4.0));
       if (texIdx == 0) return triplanarMap(uOozeTex0, p, n);
       if (texIdx == 1) return triplanarMap(uOozeTex1, p, n);
       if (texIdx == 2) return triplanarMap(uOozeTex2, p, n);
-      if (texIdx == 3) return triplanarMap(uOozeTex3, p, n);
-      if (texIdx == 4) return triplanarMap(uOozeTex4, p, n);
-      if (texIdx == 5) return triplanarMap(uOozeTex5, p, n);
-      if (texIdx == 6) return triplanarMap(uOozeTex6, p, n);
-      return triplanarMap(uOozeTex7, p, n);
+      return triplanarMap(uOozeTex3, p, n);
     }
 
     // Ray marching
