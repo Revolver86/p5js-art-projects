@@ -127,9 +127,14 @@ function draw() {
     shaderProgram.setUniform(`uOozeTex${i}`, oozeTextures[i]);
   }
 
-  // Draw fullscreen quad (WEBGL mode centers at origin)
+  // Draw fullscreen quad
   noStroke();
-  rect(-width/2, -height/2, width, height);
+  beginShape();
+  vertex(-1, -1, 0);
+  vertex(1, -1, 0);
+  vertex(1, 1, 0);
+  vertex(-1, 1, 0);
+  endShape(CLOSE);
 }
 
 function updateFluidTexture() {
@@ -260,7 +265,9 @@ function vertexShader() {
   return `
     precision highp float;
     attribute vec3 aPosition;
+
     void main() {
+      // Vertices are already in clip space (-1 to 1)
       gl_Position = vec4(aPosition, 1.0);
     }
   `;
